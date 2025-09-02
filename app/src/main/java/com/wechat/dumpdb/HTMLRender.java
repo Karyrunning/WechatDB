@@ -2,12 +2,11 @@ package com.wechat.dumpdb;
 
 import android.content.Context;
 import android.util.Log;
-
+import com.wechat.dumpdb.common.TextUtil;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.sqlite.date.DateFormatUtils;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -97,6 +96,11 @@ public class HTMLRender {
         }
     }
 
+    private void renderFallbackMessage(WeChatMsg msg, Map<String, Object> formatDict) {
+        String content = msg.getMsgStr();
+        formatDict.put("content", content);
+    }
+
     private void renderVoiceMessage(WeChatMsg msg, Map<String, Object> formatDict) {
         Resource.VoiceResult voiceData = resourceManager.getVoiceMp3(msg.getImgPath());
         if (voiceData != null) {
@@ -124,85 +128,62 @@ public class HTMLRender {
         formatDict.put("img", img);
     }
 
-    private String renderMusicMessage(WeChatMsg msg, Map<String, Object> formatDict) {
+    private void renderMusicMessage(WeChatMsg msg, Map<String, Object> formatDict) {
         try {
             JSONObject musicData = new JSONObject(msg.getMsgStr());
             String content = musicData.getString("title") + " - " + musicData.getString("singer");
 
             if (msg.getImgPath() != null) {
                 String imgPath = extractImagePath(msg.getImgPath());
-                ImageData img = resourceManager.getImage(Collections.singletonList(imgPath));
+                String img = resourceManager.getImg(Collections.singletonList(imgPath));
                 if (img != null) {
                     formatDict.put("img", img);
                 }
-            } else {
-                template = getTemplate("TP_QQMUSIC_NOIMG");
             }
-
             formatDict.put("url", musicData.getString("url"));
             formatDict.put("content", content);
-            return formatTemplate(template, formatDict);
-
         } catch (JSONException e) {
             Log.e(TAG, "Failed to parse music message", e);
-            return renderFallbackMessage(msg, formatDict);
         }
     }
 
-    private String renderEmojiMessage(WeChatMsg msg, Map<String, Object> formatDict) {
-        if (template == null) return renderFallbackMessage(msg, formatDict);
-
+    private void renderEmojiMessage(WeChatMsg msg, Map<String, Object> formatDict) {
         String md5 = extractEmojiMd5(msg);
         if (md5 != null && !md5.isEmpty()) {
-            EmojiData emoji = resourceManager.getEmojiByMd5(md5);
+            EmojiReader.EmojiResult emoji = resourceManager.getEmojiByMd5(md5);
             if (emoji != null) {
-                formatDict.put("emoji_format", emoji.getFormat());
-                formatDict.put("emoji_img", emoji.getBase64Data());
-                return formatTemplate(template, formatDict);
+                formatDict.put("emoji_format", emoji.format);
+                formatDict.put("emoji_img", emoji.data);
             }
         }
-
-        return renderFallbackMessage(msg, formatDict);
     }
 
-    private String renderLinkMessage(WeChatMsg msg, Map<String, Object> formatDict) {
-        if (template == null) return renderFallbackMessage(msg, formatDict);
-
+    private void renderLinkMessage(WeChatMsg msg, Map<String, Object> formatDict) {
         LinkInfo linkInfo = parseXmlForLink(msg.getContentXmlReady());
         if (linkInfo != null && linkInfo.getUrl() != null) {
             String content = String.format("<a target=\"_blank\" href=\"%s\">%s</a>",
                     linkInfo.getUrl(),
                     linkInfo.getTitle() != null ? linkInfo.getTitle() : linkInfo.getUrl());
             formatDict.put("content", content);
-            return formatTemplate(template, formatDict);
         }
-
-        return renderFallbackMessage(msg, formatDict);
     }
 
-    private String renderVideoMessage(WeChatMsg msg, Map<String, Object> formatDict) {
-        if (template == null) return renderFallbackMessage(msg, formatDict);
-
+    private void renderVideoMessage(WeChatMsg msg, Map<String, Object> formatDict) {
         String videoPath = resourceManager.getVideo(msg.getImgPath());
         if (videoPath == null) {
             Log.w(TAG, "Cannot find video: " + msg.getImgPath());
             formatDict.put("content", "VIDEO FILE " + msg.getImgPath());
-            return formatTemplate(getTemplate("TP_MSG"), formatDict);
+            return;
         }
-
         if (videoPath.endsWith(".mp4")) {
-            String videoBase64 = resourceManager.getFileBase64(videoPath);
+            String videoBase64 = TextUtil.getFileB64(videoPath);
             formatDict.put("video_str", videoBase64);
-            return formatTemplate(template, formatDict);
         } else if (videoPath.endsWith(".jpg")) {
             // Only has thumbnail
-            String imageBase64 = resourceManager.getFileBase64(videoPath);
+            String imageBase64 = TextUtil.getFileB64(videoPath);
             ImageData imageData = new ImageData(imageBase64, "jpeg");
             formatDict.put("img", imageData);
-            return formatTemplate(getTemplate("TP_IMG"), formatDict);
         }
-
-        return renderFallbackMessage(msg, formatDict);
     }
 
     private String extractImagePath(String imgPath) {
@@ -234,56 +215,6 @@ public class HTMLRender {
         return talkers;
     }
 
-    private void prepareAvatarCss(Set<String> talkers) {
-        try {
-            String avatarTemplate = loadAssetFile("avatar.css.tpl");
-            StringBuilder avatarCss = new StringBuilder();
-
-            // My avatar
-            String myAvatar = resourceManager.getAvatar(parser.getUsername());
-            avatarCss.append(formatTemplate(avatarTemplate,
-                    Map.of("name", "me", "avatar", myAvatar)));
-
-            // Other avatars
-            for (String talker : talkers) {
-                String avatar = resourceManager.getAvatar(talker);
-                avatarCss.append(formatTemplate(avatarTemplate,
-                        Map.of("name", talker, "avatar", avatar)));
-            }
-
-            cssStrings.add(avatarCss.toString());
-        } catch (IOException e) {
-            Log.e(TAG, "Failed to prepare avatar CSS", e);
-        }
-    }
-
-    private String formatTemplate(Map<String, Object> params) {
-        if (template == null) return "";
-
-        String result = template;
-        for (Map.Entry<String, Object> entry : params.entrySet()) {
-            String placeholder = "{" + entry.getKey() + "}";
-            String value = entry.getValue() != null ? entry.getValue().toString() : "";
-            result = result.replace(placeholder, value);
-        }
-        return result;
-    }
-
-    private String compressCss(String css) {
-        // Simple CSS compression - remove comments and extra whitespace
-        return css.replaceAll("/\\*.*?\\*/", "")
-                .replaceAll("\\s+", " ")
-                .trim();
-    }
-
-    private String escapeHtml(String text) {
-        return text.replace("&", "&amp;")
-                .replace("<", "&lt;")
-                .replace(">", "&gt;")
-                .replace("\"", "&quot;")
-                .replace("'", "&#39;");
-    }
-
     // Placeholder methods - need implementation based on your XML parsing library
     private LinkInfo parseXmlForLink(String xml) {
         // TODO: Implement XML parsing to extract URL and title
@@ -293,67 +224,5 @@ public class HTMLRender {
     private String parseXmlForEmojiMd5(String xml) {
         // TODO: Implement XML parsing to extract emoji MD5
         return null;
-    }
-}
-
-class ImageData {
-    private String base64Data;
-    private String format;
-
-    public ImageData(String base64Data, String format) {
-        this.base64Data = base64Data;
-        this.format = format;
-    }
-
-    public String getBase64Data() {
-        return base64Data;
-    }
-
-    public String getFormat() {
-        return format;
-    }
-}
-
-class EmojiData {
-    private String base64Data;
-    private String format;
-
-    public String getBase64Data() {
-        return base64Data;
-    }
-
-    public String getFormat() {
-        return format;
-    }
-}
-
-class LinkInfo {
-    private String url;
-    private String title;
-
-    public String getUrl() {
-        return url;
-    }
-
-    public String getTitle() {
-        return title;
-    }
-}
-
-interface MessageSlicer {
-    List<List<WeChatMessage>> slice(List<WeChatMessage> messages);
-}
-
-class MessageSlicerByTime implements MessageSlicer {
-    public List<List<WeChatMessage>> slice(List<WeChatMessage> messages) {
-        // Implementation needed
-        return new ArrayList<>();
-    }
-}
-
-class MessageSlicerBySize implements MessageSlicer {
-    public List<List<WeChatMessage>> slice(List<WeChatMessage> messages) {
-        // Implementation needed
-        return new ArrayList<>();
     }
 }
