@@ -6,177 +6,270 @@ import android.util.Log;
 
 import com.wechat.dumpdb.common.TextUtil;
 
-import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
-import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
 
 public class AvatarReader {
     private static final String TAG = "AvatarReader";
 
-    private final File sfsDir;
-    private File avtDir;
-    private final String avtDb;
-    private boolean useAvt = true;
+    private String sfsDir;
+    private String avtDir;
+    private String avtDb;
+    private boolean useAvt;
 
     public AvatarReader(String resDir, String avtDb) {
-        this.sfsDir = new File(resDir, "sfs");
+        this.sfsDir = resDir + File.separator + "sfs";
 
-        // new location of avatar
-        this.avtDir = new File(resDir, "avatar");
-        if (!avtDir.isDirectory() || avtDir.list().length == 0) {
-            avtDir = null;
+        // New location of avatar, see #50
+        this.avtDir = resDir + File.separator + "avatar";
+        File avtDirFile = new File(this.avtDir);
+        if (!avtDirFile.isDirectory() || avtDirFile.listFiles() == null || avtDirFile.listFiles().length == 0) {
+            this.avtDir = null;
         }
 
         this.avtDb = avtDb;
+        this.useAvt = true;
 
-        if (avtDb != null) {
-            File[] files = sfsDir.listFiles((dir, name) -> name.startsWith("avatar"));
-            if (files == null || files.length == 0) {
-                // no sfs/avatar*
-                this.useAvt = false;
+        if (this.avtDb != null) {
+            // Check if sfs/avatar* files exist
+            File sfsFile = new File(this.sfsDir);
+            if (sfsFile.exists()) {
+                File[] avatarFiles = sfsFile.listFiles((dir, name) -> name.startsWith("avatar"));
+                if (avatarFiles == null || avatarFiles.length == 0) {
+                    this.avtDb = null;
+                }
             }
         }
 
-        if (avtDir == null && avtDb == null) {
+        if (this.avtDir == null && this.avtDb == null) {
             Log.w(TAG, "Cannot find avatar storage. Will not use avatar!");
             this.useAvt = false;
         }
     }
 
-    private int filenamePriority(String s) {
-        if (s.contains("_hd") && s.endsWith(".png")) {
+    private int getFilenamePriority(String filename) {
+        if (filename.contains("_hd") && filename.endsWith(".png")) {
             return 10;
         } else {
             return 1;
         }
     }
 
+    public Bitmap getAvatarFromAvtDb(String avtId) {
+        try {
+            List<AvatarCandidate> candidates = searchAvtDb(avtId);
+            candidates.sort((a, b) -> Integer.compare(getFilenamePriority(b.path), getFilenamePriority(a.path)));
+
+            for (AvatarCandidate c : candidates) {
+                Bitmap bitmap = readImgFromBlock(c.path, c.offset, c.size);
+                if (bitmap != null) {
+                    return bitmap;
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error getting avatar from database", e);
+        }
+        return null;
+    }
+
+    public Bitmap getAvatarFromAvtDir(String avtId) {
+        String dir1 = avtId.substring(0, 2);
+        String dir2 = avtId.substring(2, 4);
+
+        List<String> candidates = new ArrayList<>();
+        String searchPath = avtDir + File.separator + dir1 + File.separator + dir2;
+        File searchDir = new File(searchPath);
+
+        if (searchDir.exists() && searchDir.isDirectory()) {
+            File[] files = searchDir.listFiles((dir, name) -> name.contains(avtId));
+            if (files != null) {
+                for (File file : files) {
+                    candidates.add(file.getAbsolutePath());
+                }
+            }
+        }
+
+        // Remove duplicates and sort by priority
+        candidates = new ArrayList<>(new LinkedHashSet<>(candidates));
+        candidates.sort((a, b) -> Integer.compare(getFilenamePriority(b), getFilenamePriority(a)));
+
+        // Expand directories
+        List<String> expandedCandidates = new ArrayList<>();
+        for (String cand : candidates) {
+            File candFile = new File(cand);
+            if (candFile.isDirectory()) {
+                File[] subFiles = candFile.listFiles();
+                if (subFiles != null) {
+                    for (File subFile : subFiles) {
+                        expandedCandidates.add(subFile.getAbsolutePath());
+                    }
+                }
+            } else {
+                expandedCandidates.add(cand);
+            }
+        }
+
+        for (String cand : expandedCandidates) {
+            File candFile = new File(cand);
+            if (candFile.isDirectory()) {
+                continue;
+            }
+
+            try {
+                if (cand.endsWith(".bm")) {
+                    return readBmFile(cand);
+                } else {
+                    return BitmapFactory.decodeFile(cand);
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Error reading candidate file: " + cand, e);
+            }
+        }
+        return null;
+    }
+
     public Bitmap getAvatar(String username) {
         if (!useAvt) {
             return null;
         }
-        String avtid = TextUtil.md5(username.getBytes(StandardCharsets.UTF_8));
+
+        String avtId = TextUtil.md5(username.getBytes(StandardCharsets.UTF_8));
 
         if (avtDb != null) {
-            Bitmap bmp = getAvatarFromAvtDb(avtid);
-            if (bmp != null) return bmp;
+            Bitmap bitmap = getAvatarFromAvtDb(avtId);
+            if (bitmap != null) {
+                return bitmap;
+            }
         }
 
         if (avtDir != null) {
-            Bitmap bmp = getAvatarFromAvtDir(avtid);
-            if (bmp != null) return bmp;
+            Bitmap bitmap = getAvatarFromAvtDir(avtId);
+            if (bitmap != null) {
+                return bitmap;
+            }
         }
 
         Log.w(TAG, "Avatar file for " + username + " not found.");
         return null;
     }
 
-    private Bitmap getAvatarFromAvtDb(String avtid) {
-        try {
-            List<String[]> candidates = searchAvtDb(avtid);
-            candidates.sort((a, b) -> filenamePriority(b[0]) - filenamePriority(a[0]));
-            for (String[] c : candidates) {
-                String path = c[0];
-                long offset = Long.parseLong(c[1]);
-                int size = Integer.parseInt(c[2]);
-                return readImgFromBlock(path, offset, size);
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "getAvatarFromAvtDb failed", e);
+    public void saveAvatarToAvtDir(String username, Bitmap bitmap) {
+        if (avtDir == null) {
+            Log.w(TAG, "Avatar directory not available for saving");
+            return;
         }
-        return null;
+
+        String avtId = TextUtil.md5(username.getBytes(StandardCharsets.UTF_8));
+        String dir1 = avtId.substring(0, 2);
+        String dir2 = avtId.substring(2, 4);
+        String fname = avtDir + File.separator + dir1 + File.separator + dir2 + File.separator + "user_" + avtId + ".png";
+
+        try {
+            File file = new File(fname);
+            file.getParentFile().mkdirs();
+
+            try (FileOutputStream fos = new FileOutputStream(file)) {
+                bitmap.compress(Bitmap.CompressFormat.PNG, 100, fos);
+                Log.i(TAG, "Caching downloaded avatar for " + username + " to " + fname);
+            }
+        } catch (IOException e) {
+            Log.e(TAG, "Error saving avatar to " + fname, e);
+        }
     }
 
-    private Bitmap getAvatarFromAvtDir(String avtid) {
-        File dir1 = new File(avtDir, avtid.substring(0, 2));
-        File dir2 = new File(dir1, avtid.substring(2, 4));
-        File[] candidates = dir2.listFiles((dir, name) -> name.contains(avtid));
-        if (candidates == null) return null;
+    public Bitmap readImgFromBlock(String filename, long pos, int size) {
+        long fileIdx = pos >> 32;
+        String fname = sfsDir + File.separator + "avatar.block." + String.format("%05d", fileIdx);
+        long startPos = pos - fileIdx * (1L << 32) + 16 + filename.length() + 1;
 
-        List<File> candList = new ArrayList<>();
-        Collections.addAll(candList, candidates);
-        candList.sort((a, b) -> filenamePriority(b.getName()) - filenamePriority(a.getName()));
-
-        for (File cand : candList) {
-            if (cand.isDirectory()) continue;
-            try {
-                if (cand.getName().endsWith(".bm")) {
-                    return readBmFile(cand);
-                } else {
-                    return BitmapFactory.decodeFile(cand.getAbsolutePath());
-                }
-            } catch (Exception e) {
-                Log.e(TAG, "Error reading avatar from " + cand, e);
-            }
-        }
-        return null;
-    }
-
-    private Bitmap readImgFromBlock(String filename, long pos, int size) {
-        try {
-            long fileIdx = pos >> 32;
-            File fname = new File(sfsDir, String.format("avatar.block.%05d", fileIdx));
-            long startPos = pos - fileIdx * (1L << 32) + 16 + filename.length() + 1;
-
-            RandomAccessFile raf = new RandomAccessFile(fname, "r");
-            raf.seek(startPos);
+        try (RandomAccessFile file = new RandomAccessFile(fname, "r")) {
+            file.seek(startPos);
             byte[] data = new byte[size];
-            raf.readFully(data);
-            raf.close();
-
-            return BitmapFactory.decodeStream(new ByteArrayInputStream(data));
+            file.readFully(data);
+            return BitmapFactory.decodeByteArray(data, 0, data.length);
         } catch (IOException e) {
-            Log.w(TAG, "Cannot read avatar block: " + e.getMessage());
+            Log.w(TAG, "Cannot read avatar from " + fname + ": " + e.getMessage());
             return null;
         }
     }
 
-    private Bitmap readBmFile(File f) {
-        try (FileInputStream fis = new FileInputStream(f)) {
-            int size = 96;
-            int[] pixels = new int[size * size];
-            byte[] buf = new byte[4];
-            for (int i = 0; i < size; i++) {
-                for (int j = 0; j < size; j++) {
-                    int read = fis.read(buf);
-                    if (read != 4) continue;
-                    int r = buf[0] & 0xff;
-                    int g = buf[1] & 0xff;
-                    int b = buf[2] & 0xff;
-                    pixels[i * size + j] = 0xff000000 | (r << 16) | (g << 8) | b;
+    public Bitmap readBmFile(String fname) {
+        try (FileInputStream fis = new FileInputStream(fname)) {
+            // filesize is 36880=96x96x4+16
+            int width = 96, height = 96;
+            int[] pixels = new int[width * height];
+
+            for (int i = 0; i < height; i++) {
+                for (int j = 0; j < width; j++) {
+                    int r = fis.read();
+                    int g = fis.read();
+                    int b = fis.read();
+                    int a = fis.read(); // alpha, not used
+
+                    if (r == -1 || g == -1 || b == -1 || a == -1) {
+                        throw new IOException("Unexpected end of file");
+                    }
+
+                    // Convert to ARGB format
+                    pixels[i * width + j] = (0xFF << 24) | (r << 16) | (g << 8) | b;
                 }
             }
-            return Bitmap.createBitmap(pixels, size, size, Bitmap.Config.ARGB_8888);
+
+            return Bitmap.createBitmap(pixels, width, height, Bitmap.Config.ARGB_8888);
         } catch (IOException e) {
-            Log.e(TAG, "readBmFile failed", e);
+            Log.e(TAG, "Error reading BM file: " + fname, e);
             return null;
         }
     }
 
-    private List<String[]> searchAvtDb(String avtid) throws Exception {
-        List<String[]> candidates = new ArrayList<>();
-        Connection conn = DriverManager.getConnection("jdbc:sqlite:" + avtDb);
-        Statement stmt = conn.createStatement();
-        ResultSet rs = stmt.executeQuery("select FileName, Offset, Size from Index_avatar");
-        while (rs.next()) {
-            String path = rs.getString(1);
-            if (path.contains(avtid)) {
-                candidates.add(new String[]{path, rs.getString(2), rs.getString(3)});
+    private List<AvatarCandidate> searchAvtDb(String avtId) {
+        List<AvatarCandidate> candidates = new ArrayList<>();
+
+        try {
+            String url = "jdbc:sqlite:" + avtDb;
+            try (Connection conn = DriverManager.getConnection(url);
+                 Statement stmt = conn.createStatement();
+                 ResultSet rs = stmt.executeQuery("SELECT FileName, Offset, Size FROM Index_avatar")) {
+
+                while (rs.next()) {
+                    String path = rs.getString("FileName");
+                    long offset = rs.getLong("Offset");
+                    int size = rs.getInt("Size");
+
+                    if (path.contains(avtId)) {
+                        candidates.add(new AvatarCandidate(path, offset, size));
+                    }
+                }
             }
+        } catch (SQLException e) {
+            Log.e(TAG, "Error searching avatar database", e);
         }
-        rs.close();
-        stmt.close();
-        conn.close();
+
         return candidates;
+    }
+
+    // Helper class to store avatar candidate information
+    private static class AvatarCandidate {
+        final String path;
+        final long offset;
+        final int size;
+
+        AvatarCandidate(String path, long offset, int size) {
+            this.path = path;
+            this.offset = offset;
+            this.size = size;
+        }
     }
 }

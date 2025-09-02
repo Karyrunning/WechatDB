@@ -401,48 +401,20 @@ public class WeChatDBParser {
         }
     }
 
-    /**
-     * 表情信息内部类
-     */
-    public static class EmojiInfo {
-        private String catalog;
-        private String name;
-        private String cdnUrl;
-        private String encryptUrl;
-        private String aesKey;
-
-        public EmojiInfo(String catalog, String name, String cdnUrl, String encryptUrl, String aesKey) {
-            this.catalog = catalog;
-            this.name = name;
-            this.cdnUrl = cdnUrl;
-            this.encryptUrl = encryptUrl;
-            this.aesKey = aesKey;
-        }
-
-        // Getters
-        public String getCatalog() {
-            return catalog;
-        }
-
-        public String getName() {
-            return name;
-        }
-
-        public String getCdnUrl() {
-            return cdnUrl;
-        }
-
-        public String getEncryptUrl() {
-            return encryptUrl;
-        }
-
-        public String getAesKey() {
-            return aesKey;
-        }
-    }
-
     public Map<String, String> getAvatarUrls() {
         return avatarUrls;
+    }
+
+    public Map<String, EmojiInfo> getEmojiInfo() {
+        return emojiInfo;
+    }
+
+    public Map<String, String> getEmojiGroups() {
+        return emojiGroups;
+    }
+
+    public Map<String, String> getImgInfo() {
+        return imgInfo;
     }
 }
 

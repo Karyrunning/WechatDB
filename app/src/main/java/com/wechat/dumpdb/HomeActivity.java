@@ -2,11 +2,9 @@ package com.wechat.dumpdb;
 
 import android.Manifest;
 import android.content.pm.PackageManager;
-import android.database.Cursor;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
-import android.util.Log;
 import android.view.View;
 import android.widget.Toast;
 
@@ -14,9 +12,6 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
-import net.zetetic.database.sqlcipher.SQLiteDatabase;
-
-import java.io.DataOutputStream;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -35,20 +30,28 @@ public class HomeActivity extends AppCompatActivity {
         new Handler().post(new Runnable() {
             @Override
             public void run() {
-//                String dbRoot = "/storage/emulated/0/Download/com.tencent.mm/MicroMsg/3d7f491a654552450d1352e52d0891a1";
-                String dbRoot = "/storage/emulated/0/Download";
+                String dbRoot = "/storage/emulated/0/Download/com.tencent.mm/MicroMsg/3d7f491a654552450d1352e52d0891a1";
+//                String dbRoot = "/storage/emulated/0/Download";
                 String dbPath = dbRoot + "/EnMicroMsg.db";
                 String passWord = "10efc55";
-                SQLiteDatabase db = CipherDBHelper.openDatabase(dbPath, passWord);
-                // 查询
-                Cursor c = db.rawQuery("SELECT id,type,value FROM userinfo", null);
-                while (c.moveToNext()) {
-                    String name = c.getString(0);
-                    String type = c.getString(1);
-                    Log.d("SQLCipher", "表: " + name + " 类型: " + type);
-                }
-                c.close();
-                db.close();
+                String wxgfServer = "server:port";
+
+//                SQLiteDatabase db = CipherDBHelper.openDatabase(dbPath, passWord);
+//                // 查询
+//                Cursor c = db.rawQuery("SELECT id,type,value FROM userinfo", null);
+//                while (c.moveToNext()) {
+//                    String name = c.getString(0);
+//                    String type = c.getString(1);
+//                    Log.d("SQLCipher", "表: " + name + " 类型: " + type);
+//                }
+//                c.close();
+//                db.close();
+
+                WeChatDBParser dbParser = new WeChatDBParser(dbPath, passWord);
+                String chatId = dbParser.getChatId("wxid_t0oqgckajq2522");
+                List<WeChatMsg> msgList = dbParser.getMessagesByChat(chatId);
+                Resource resource = new Resource(dbParser, dbRoot, wxgfServer, "avatar.index", getBaseContext());
+                resource.cacheVoiceMp3(msgList);
             }
         });
     }
