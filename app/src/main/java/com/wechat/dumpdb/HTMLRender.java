@@ -8,6 +8,9 @@ import com.wechat.dumpdb.common.TextUtil;
 
 import org.json.JSONException;
 import org.json.JSONObject;
+import org.jsoup.Jsoup;
+import org.jsoup.nodes.Document;
+import org.jsoup.nodes.Element;
 import org.sqlite.date.DateFormatUtils;
 
 import java.util.ArrayList;
@@ -69,20 +72,26 @@ public class HTMLRender {
         switch (msg.getType()) {
             case WeChatMsg.TYPE_SPEAK:
                 renderVoiceMessage(msg, formatDict);
+                break;
             case WeChatMsg.TYPE_IMG:
                 renderImageMessage(msg, formatDict);
+                break;
             case WeChatMsg.TYPE_QQMUSIC:
                 renderMusicMessage(msg, formatDict);
+                break;
             case WeChatMsg.TYPE_EMOJI:
             case WeChatMsg.TYPE_CUSTOM_EMOJI:
                 renderEmojiMessage(msg, formatDict);
+                break;
             case WeChatMsg.TYPE_LINK:
                 renderLinkMessage(msg, formatDict);
+                break;
             case WeChatMsg.TYPE_VIDEO_FILE:
                 renderVideoMessage(msg, formatDict);
+                break;
             case WeChatMsg.TYPE_WX_VIDEO:
-                // TODO: implement WeChat video rendering
                 renderFallbackMessage(msg, formatDict);
+                break;
             default:
                 renderFallbackMessage(msg, formatDict);
         }
@@ -136,7 +145,7 @@ public class HTMLRender {
             formatDict.put("url", musicData.getString("url"));
             formatDict.put("content", content);
         } catch (JSONException e) {
-            Log.e(TAG, "Failed to parse music message", e);
+            renderFallbackMessage(msg, formatDict);
         }
     }
 
@@ -153,7 +162,7 @@ public class HTMLRender {
 
     private void renderLinkMessage(WeChatMsg msg, Map<String, Object> formatDict) {
         LinkInfo linkInfo = parseXmlForLink(msg.getContentXmlReady());
-        if (linkInfo != null && linkInfo.getUrl() != null) {
+        if (linkInfo.getUrl() != null) {
             String content = String.format("<a target=\"_blank\" href=\"%s\">%s</a>",
                     linkInfo.getUrl(),
                     linkInfo.getTitle() != null ? linkInfo.getTitle() : linkInfo.getUrl());
@@ -208,10 +217,36 @@ public class HTMLRender {
         return talkers;
     }
 
-    // Placeholder methods - need implementation based on your XML parsing library
     private LinkInfo parseXmlForLink(String xml) {
-        // TODO: Implement XML parsing to extract URL and title
-        return null;
+        LinkInfo linkInfo = new LinkInfo();
+        try {
+            // 用 Jsoup 解析 XML
+            Document doc = Jsoup.parse(xml, "", org.jsoup.parser.Parser.xmlParser());
+            // 获取 <url> 节点文本
+            Element urlElement = doc.selectFirst("url");
+            if (urlElement != null) {
+                String url = urlElement.text();
+                String title;
+                try {
+                    Element titleElement = doc.selectFirst("title");
+                    if (titleElement != null) {
+                        title = titleElement.text();
+                    } else {
+                        title = url;
+                    }
+                } catch (Exception e) {
+                    // 如果没有 <title> 节点，就用 url
+                    title = url;
+                }
+                // 拼接成 HTML 超链接
+                String content = String.format("<a target=\"_blank\" href=\"%s\">%s</a>", url, title);
+                linkInfo.setTitle(title);
+                linkInfo.setUrl(url);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return linkInfo;
     }
 
     private String parseXmlForEmojiMd5(String xml) {
