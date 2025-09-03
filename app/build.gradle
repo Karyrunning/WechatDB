@@ -62,16 +62,13 @@ dependencies {
     implementation 'androidx.sqlite:sqlite:2.3.1'
     implementation 'org.jsoup:jsoup:1.21.2'
     implementation 'com.squareup.okhttp3:okhttp:4.12.0'
-    // 音频处理库（根据需要选择）
-    implementation 'com.arthenica:mobile-ffmpeg-full:4.4.LTS'
     // 或者使用 ExoPlayer 处理音频
     implementation 'com.google.android.exoplayer:exoplayer:2.19.1'
     implementation 'org.java-websocket:Java-WebSocket:1.5.3'
     implementation 'org.xerial:sqlite-jdbc:3.42.0.0'
-    implementation 'com.arthenica:ffmpeg-kit-full:6.0-2'
-    // 或者使用较小的版本：
-    // implementation 'com.arthenica:ffmpeg-kit-min:6.0-2'
+    implementation("com.antonkarpenko:ffmpeg-kit-full:1.2.0")
     implementation 'com.alibaba.fastjson2:fastjson2:2.0.58'
+    implementation 'com.google.code.gson:gson:2.11.0'
 
     testImplementation 'junit:junit:4.13.2'
     androidTestImplementation 'androidx.test.ext:junit:1.1.5'

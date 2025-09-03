@@ -34,7 +34,7 @@ public class HomeActivity extends AppCompatActivity {
 //                String dbRoot = "/storage/emulated/0/Download";
                 String dbPath = dbRoot + "/EnMicroMsg.db";
                 String passWord = "10efc55";
-                String wxgfServer = "server:port";
+                String wxgfServer = "192.168.80.188:8666";
 
 //                SQLiteDatabase db = CipherDBHelper.openDatabase(dbPath, passWord);
 //                // 查询
@@ -48,10 +48,14 @@ public class HomeActivity extends AppCompatActivity {
 //                db.close();
 
                 WeChatDBParser dbParser = new WeChatDBParser(dbPath, passWord);
-                String chatId = dbParser.getChatId("wxid_t0oqgckajq2522");
+                String chatId = dbParser.getChatId("karyrunning");
                 List<WeChatMsg> msgList = dbParser.getMessagesByChat(chatId);
                 Resource resource = new Resource(dbParser, dbRoot, wxgfServer, "avatar.index", getBaseContext());
                 resource.cacheVoiceMp3(msgList);
+                HTMLRender render = new HTMLRender(getBaseContext(), dbParser, resource);
+                for (WeChatMsg chatMsg : msgList) {
+                    render.renderMessage(chatMsg);
+                }
             }
         });
     }

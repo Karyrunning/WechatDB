@@ -5,6 +5,10 @@ import android.media.MediaMetadataRetriever;
 import android.util.Base64;
 import android.util.Log;
 
+import com.antonkarpenko.ffmpegkit.FFmpegKit;
+import com.antonkarpenko.ffmpegkit.FFmpegSession;
+import com.antonkarpenko.ffmpegkit.ReturnCode;
+
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -73,13 +77,9 @@ public class AudioParserFFmpegKit {
 
     private float convertToMp3WithFFmpegKit(String inputFile, String outputFile) throws Exception {
         // Using FFmpegKit library (add to dependencies)
-        /*
-        String command = String.format("-i %s -acodec libmp3lame -ar 16000 -ac 1 -y %s",
-                                     inputFile, outputFile);
-
+        String command = String.format("-i %s -acodec libmp3lame -ar 16000 -ac 1 -y %s", inputFile, outputFile);
         FFmpegSession session = FFmpegKit.execute(command);
         ReturnCode returnCode = session.getReturnCode();
-
         if (ReturnCode.isSuccess(returnCode)) {
             // Get duration
             return getAudioDuration(outputFile);
@@ -87,11 +87,6 @@ public class AudioParserFFmpegKit {
             String failureMessage = session.getFailStackTrace();
             throw new RuntimeException("FFmpeg conversion failed: " + failureMessage);
         }
-        */
-
-        // Placeholder implementation - replace with actual FFmpegKit code
-        Log.w(TAG, "FFmpegKit implementation needed");
-        return 0;
     }
 
     private float getAudioDuration(String audioFile) {

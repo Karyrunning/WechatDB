@@ -37,7 +37,7 @@ public class Resource {
     private EmojiReader emojiReader;
     private ExecutorService executorService;
     private OkHttpClient httpClient;
-    private AudioParser audioParser;
+    private AudioParserFFmpegKit audioParser;
     private Context androidContext; // Android context for audio parsing
 
     public Resource(WeChatDBParser parser, String resDir, String wxgfServer, String avtDb, Context context) {
@@ -60,7 +60,7 @@ public class Resource {
         this.emojiReader = new EmojiReader(resDir, parser, wxgfDecoder, null);
         this.executorService = Executors.newFixedThreadPool(3);
         this.httpClient = new OkHttpClient();
-        this.audioParser = new AudioParser(context);
+        this.audioParser = new AudioParserFFmpegKit(context);
 
         // Register shutdown hook
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
@@ -420,7 +420,7 @@ public class Resource {
                 Log.e(TAG, "Android Context not available for audio parsing");
                 return new VoiceResult("", 0);
             }
-            audioParser = new AudioParser(androidContext);
+            audioParser = new AudioParserFFmpegKit(androidContext);
         }
 
         try {

@@ -2,7 +2,10 @@ package com.wechat.dumpdb;
 
 import android.content.Context;
 import android.util.Log;
+
+import com.google.gson.Gson;
 import com.wechat.dumpdb.common.TextUtil;
+
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.sqlite.date.DateFormatUtils;
@@ -18,27 +21,16 @@ import java.util.Set;
 public class HTMLRender {
     private static final String TAG = "WeChatHTMLRenderer";
 
-    // Message types (from original Python code)
-    public static final int TYPE_MSG = 1;
-    public static final int TYPE_IMG = 3;
-    public static final int TYPE_SPEAK = 34;
-    public static final int TYPE_EMOJI = 47;
-    public static final int TYPE_CUSTOM_EMOJI = 49;
-    public static final int TYPE_LINK = 5;
-    public static final int TYPE_VIDEO_FILE = 62;
-    public static final int TYPE_QQMUSIC = 436207665;
-    public static final int TYPE_WX_VIDEO = 43;
-
     // Template mappings
     private static final Map<Integer, String> TEMPLATE_FILES = new HashMap<Integer, String>() {{
-        put(TYPE_MSG, "TP_MSG");
-        put(TYPE_IMG, "TP_IMG");
-        put(TYPE_SPEAK, "TP_SPEAK");
-        put(TYPE_EMOJI, "TP_EMOJI");
-        put(TYPE_CUSTOM_EMOJI, "TP_EMOJI");
-        put(TYPE_LINK, "TP_MSG");
-        put(TYPE_VIDEO_FILE, "TP_VIDEO_FILE");
-        put(TYPE_QQMUSIC, "TP_QQMUSIC");
+        put(WeChatMsg.TYPE_MSG, "TP_MSG");
+        put(WeChatMsg.TYPE_IMG, "TP_IMG");
+        put(WeChatMsg.TYPE_SPEAK, "TP_SPEAK");
+        put(WeChatMsg.TYPE_EMOJI, "TP_EMOJI");
+        put(WeChatMsg.TYPE_CUSTOM_EMOJI, "TP_EMOJI");
+        put(WeChatMsg.TYPE_LINK, "TP_MSG");
+        put(WeChatMsg.TYPE_VIDEO_FILE, "TP_VIDEO_FILE");
+        put(WeChatMsg.TYPE_QQMUSIC, "TP_QQMUSIC");
     }};
 
     private Context context;
@@ -58,7 +50,7 @@ public class HTMLRender {
      * Render a single WeChat message to HTML
      */
     public void renderMessage(WeChatMsg msg) {
-        String sender = msg.getIsSend() == 1 ? "me" : ("you " + msg.getTalker());
+        String sender = msg.getIsSend() == 1 ? "me" : (msg.getTalker());
         Map<String, Object> formatDict = new HashMap<>();
         formatDict.put("sender_label", sender);
         formatDict.put("time", DateFormatUtils.format(msg.getCreateTime(), "yyyy-MM-dd HH:mm:ss"));
@@ -75,25 +67,26 @@ public class HTMLRender {
             formatDict.put("nickname", " ");
         }
         switch (msg.getType()) {
-            case TYPE_SPEAK:
+            case WeChatMsg.TYPE_SPEAK:
                 renderVoiceMessage(msg, formatDict);
-            case TYPE_IMG:
+            case WeChatMsg.TYPE_IMG:
                 renderImageMessage(msg, formatDict);
-            case TYPE_QQMUSIC:
+            case WeChatMsg.TYPE_QQMUSIC:
                 renderMusicMessage(msg, formatDict);
-            case TYPE_EMOJI:
-            case TYPE_CUSTOM_EMOJI:
+            case WeChatMsg.TYPE_EMOJI:
+            case WeChatMsg.TYPE_CUSTOM_EMOJI:
                 renderEmojiMessage(msg, formatDict);
-            case TYPE_LINK:
+            case WeChatMsg.TYPE_LINK:
                 renderLinkMessage(msg, formatDict);
-            case TYPE_VIDEO_FILE:
+            case WeChatMsg.TYPE_VIDEO_FILE:
                 renderVideoMessage(msg, formatDict);
-            case TYPE_WX_VIDEO:
+            case WeChatMsg.TYPE_WX_VIDEO:
                 // TODO: implement WeChat video rendering
                 renderFallbackMessage(msg, formatDict);
             default:
                 renderFallbackMessage(msg, formatDict);
         }
+        Log.i(TAG, new Gson().toJson(formatDict));
     }
 
     private void renderFallbackMessage(WeChatMsg msg, Map<String, Object> formatDict) {
