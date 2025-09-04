@@ -69,6 +69,7 @@ dependencies {
     implementation("com.antonkarpenko:ffmpeg-kit-full:1.2.0")
     implementation 'com.alibaba.fastjson2:fastjson2:2.0.58'
     implementation 'com.google.code.gson:gson:2.11.0'
+    implementation 'cc.imorning:silk:1.0.1'
 
     testImplementation 'junit:junit:4.13.2'
     androidTestImplementation 'androidx.test.ext:junit:1.1.5'

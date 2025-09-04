@@ -15,6 +15,9 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 
+import cc.imorning.silk.AudioConfig;
+import cc.imorning.silk.SilkDecoder;
+
 public class AudioParserFFmpegKit {
     private static final String TAG = "AudioParserFFmpegKit";
 
@@ -58,7 +61,8 @@ public class AudioParserFFmpegKit {
 
             if (headerStr.contains("AMR") || headerStr.contains("SILK")) {
                 // Use FFmpegKit for both AMR and SILK
-                duration = convertToMp3WithFFmpegKit(fileName, mp3File);
+//                duration = convertToMp3WithFFmpegKit(fileName, mp3File);
+                duration = convertToMp3WithFFmpegKit2(fileName, mp3File);
             } else {
                 throw new UnsupportedOperationException("Audio file format cannot be recognized.");
             }
@@ -78,8 +82,20 @@ public class AudioParserFFmpegKit {
     private float convertToMp3WithFFmpegKit(String inputFile, String outputFile) throws Exception {
         // Using FFmpegKit library (add to dependencies)
         String command = String.format("-i %s -acodec libmp3lame -ar 16000 -ac 1 -y %s", inputFile, outputFile);
+
+
+        // 方案1: 尝试强制指定输入格式
+//        String command = "-f amr -i \"" + inputFile + "\" -acodec libmp3lame -ar 16000 -ac 1 -y \"" + outputFile + "\"";
+
+//        // 方案2: 尝试使用不同的解码器
+//        String command = "-i \"" + inputFile + "\" -acodec mp3 -ar 16000 -ac 1 -y \"" + outputFile + "\"";
+//
+//        // 方案3: 增加错误容忍参数
+//        String command = "-err_detect ignore_err -i \"" + inputFile + "\" -acodec libmp3lame -ar 16000 -ac 1 -y \"" + outputFile + "\"";
+
         FFmpegSession session = FFmpegKit.execute(command);
         ReturnCode returnCode = session.getReturnCode();
+        Log.i(TAG, "语音转结果:" + ReturnCode.isSuccess(returnCode));
         if (ReturnCode.isSuccess(returnCode)) {
             // Get duration
             return getAudioDuration(outputFile);
@@ -87,6 +103,40 @@ public class AudioParserFFmpegKit {
             String failureMessage = session.getFailStackTrace();
             throw new RuntimeException("FFmpeg conversion failed: " + failureMessage);
         }
+    }
+
+    private float convertToMp3WithFFmpegKit2(String inputFile, String outputFile) throws Exception {
+        try {
+            // 第一步：SILK 解码
+            String pcmPath = inputFile.replace(".amr", ".pcm");
+
+            // 使用 SILK 库解码
+            String result = SilkDecoder.INSTANCE.doDecode(inputFile, pcmPath, AudioConfig.AudioSampleRate.SAMPLE_RATE_16K);
+
+            if (result != null) {
+                // 第二步：PCM 转 MP3
+                String command = "-f s16le -ar 24000 -ac 1 -i \"" + pcmPath + "\" " +
+                        "-acodec libmp3lame -ar 16000 -ac 1 -y \"" + outputFile + "\"";
+
+                FFmpegSession session = FFmpegKit.execute(command);
+
+                if (ReturnCode.isSuccess(session.getReturnCode())) {
+                    Log.d("Convert", "转换成功");
+                    return getAudioDuration(outputFile);
+                } else {
+                    Log.e("Convert", "FFmpeg 转换失败: " + session.getAllLogsAsString());
+                }
+
+                // 清理临时文件
+                new File(pcmPath).delete();
+            } else {
+                Log.e("Convert", "SILK 解码失败");
+            }
+
+        } catch (Exception e) {
+            Log.e("Convert", "转换异常", e);
+        }
+        return 0;
     }
 
     private float getAudioDuration(String audioFile) {
@@ -110,7 +160,7 @@ public class AudioParserFFmpegKit {
     }
 
     private File createTempDirectory() throws IOException {
-        File tempDir = new File(context.getCacheDir(), "wechatdump_audio_" + System.currentTimeMillis());
+        File tempDir = new File(context.getExternalCacheDir(), "wechatdump_audio_" + System.currentTimeMillis());
         if (!tempDir.mkdirs()) {
             throw new IOException("Failed to create temporary directory: " + tempDir);
         }

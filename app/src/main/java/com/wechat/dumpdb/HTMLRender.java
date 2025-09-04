@@ -4,7 +4,6 @@ import android.content.Context;
 import android.util.Log;
 
 import com.google.gson.Gson;
-import com.wechat.dumpdb.common.TextUtil;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -69,6 +68,7 @@ public class HTMLRender {
         } else {
             formatDict.put("nickname", " ");
         }
+//        formatDict.put("data", msg.getContentXmlReady());
         switch (msg.getType()) {
             case WeChatMsg.TYPE_SPEAK:
                 renderVoiceMessage(msg, formatDict);
@@ -128,6 +128,7 @@ public class HTMLRender {
             return;
         }
         formatDict.put("img", img);
+        formatDict.put("filenames", filenames);
     }
 
     private void renderMusicMessage(WeChatMsg msg, Map<String, Object> formatDict) {
@@ -178,14 +179,15 @@ public class HTMLRender {
             return;
         }
         if (videoPath.endsWith(".mp4")) {
-            String videoBase64 = TextUtil.getFileB64(videoPath);
-            formatDict.put("video_str", videoBase64);
+//            String videoBase64 = TextUtil.getFileB64(videoPath);
+//            formatDict.put("video_str", videoBase64);
         } else if (videoPath.endsWith(".jpg")) {
             // Only has thumbnail
-            String imageBase64 = TextUtil.getFileB64(videoPath);
-            ImageData imageData = new ImageData(imageBase64, "jpeg");
-            formatDict.put("img", imageData);
+//            String imageBase64 = TextUtil.getFileB64(videoPath);
+//            ImageData imageData = new ImageData(imageBase64, "jpeg");
+//            formatDict.put("img", imageData);
         }
+        formatDict.put("filePath", videoPath);
     }
 
     private String extractImagePath(String imgPath) {
