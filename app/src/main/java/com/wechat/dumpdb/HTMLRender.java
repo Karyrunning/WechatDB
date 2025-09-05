@@ -186,21 +186,28 @@ public class HTMLRender {
 
     private void renderVideoMessage(WeChatMsg msg, Map<String, Object> formatDict) {
         String videoPath = resourceManager.getVideo(msg.getImgPath());
-        if (videoPath == null) {
-            Log.w(TAG, "Cannot find video: " + msg.getImgPath());
-            formatDict.put("content", "VIDEO FILE " + msg.getImgPath());
-            return;
-        }
-        if (videoPath.endsWith(".mp4")) {
+        if (videoPath != null) {
+            if (videoPath.endsWith(".mp4")) {
 //            String videoBase64 = TextUtil.getFileB64(videoPath);
 //            formatDict.put("video_str", videoBase64);
-        } else if (videoPath.endsWith(".jpg")) {
-            // Only has thumbnail
+            } else if (videoPath.endsWith(".jpg")) {
+                // Only has thumbnail
 //            String imageBase64 = TextUtil.getFileB64(videoPath);
 //            ImageData imageData = new ImageData(imageBase64, "jpeg");
 //            formatDict.put("img", imageData);
+            }
+            formatDict.put("filePath", videoPath);
+        } else {
+            // 解析视频信息
+            WeChatCDNVideoDecoder.WeChatVideoInfo videoInfo = WeChatCDNVideoDecoder.parseReservedContent(msg.getReserved());
+            if (videoInfo != null) {
+                String downloadUrl = WeChatCDNVideoDecoder.buildCdnDownloadUrl(videoInfo.cdnVideoUrl, videoInfo.aesKey);
+                formatDict.put("filePath", downloadUrl);
+            } else {
+                Log.w(TAG, "Cannot find video: " + msg.getImgPath());
+                formatDict.put("content", "VIDEO FILE " + msg.getImgPath());
+            }
         }
-        formatDict.put("filePath", videoPath);
     }
 
     private String extractImagePath(String imgPath) {

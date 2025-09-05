@@ -58,9 +58,11 @@ public class WeChatMsg {
     private String talkerNickname;
     private boolean knownType;
 
+    private String reserved;
+
     public WeChatMsg(long msgSvrId, int type, int isSend, long createTime,
                      String talker, String content, String imgPath, String chat,
-                     String chatNickname, String talkerNickname, String msgId) {
+                     String chatNickname, String talkerNickname, String msgId, String reserved) {
         this.msgSvrId = msgSvrId;
         this.type = type;
         this.isSend = isSend;
@@ -73,6 +75,7 @@ public class WeChatMsg {
         this.talkerNickname = talkerNickname;
         this.knownType = isKnownType(type);
         this.msgId = msgId;
+        this.reserved = reserved;
     }
 
     /**
@@ -448,5 +451,9 @@ public class WeChatMsg {
 
     public void setTalkerNickname(String talkerNickname) {
         this.talkerNickname = talkerNickname;
+    }
+
+    public String getReserved() {
+        return reserved;
     }
 }

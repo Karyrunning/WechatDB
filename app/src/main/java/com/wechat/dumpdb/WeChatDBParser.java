@@ -17,7 +17,7 @@ public class WeChatDBParser {
 
     // 数据库字段定义
     private static final String[] FIELDS = {
-            "msgSvrId", "type", "isSend", "createTime", "talker", "content", "imgPath", "msgId"
+            "msgSvrId", "type", "isSend", "createTime", "talker", "content", "imgPath", "msgId", "reserved"
     };
 
     private SQLiteDatabase database;
@@ -179,6 +179,7 @@ public class WeChatDBParser {
             String content = cursor.getString(5);
             String imgPath = cursor.getString(6);
             String msgId = cursor.getString(7);
+            String reserved = cursor.getString(8);
 
             if (content == null) content = "";
 
@@ -220,7 +221,7 @@ public class WeChatDBParser {
             }
 
             return new WeChatMsg(msgSvrId, type, isSend, createTime, talker,
-                    content, imgPath, chat, chatNickname, talkerNickname, msgId);
+                    content, imgPath, chat, chatNickname, talkerNickname, msgId, reserved);
 
         } catch (Exception e) {
             Log.e(TAG, "Error parsing message row: " + e.getMessage());

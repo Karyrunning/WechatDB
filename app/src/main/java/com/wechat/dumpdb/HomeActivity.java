@@ -72,6 +72,9 @@ public class HomeActivity extends AppCompatActivity {
                 HTMLRender render = new HTMLRender(getBaseContext(), dbParser, resource, filePathResolver);
                 List<Map<String, Object>> dataList = new ArrayList<>();
                 for (WeChatMsg chatMsg : msgList) {
+//                    if (!"190".equals(chatMsg.getMsgId())) {
+//                        continue;
+//                    }
                     dataList.add(render.renderMessage(chatMsg));
                 }
                 Log.d(TAG, "转换完成");
