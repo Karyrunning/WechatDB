@@ -5,14 +5,23 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.util.Base64;
 import android.util.Log;
-import java.io.*;
+
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.util.*;
-import java.util.concurrent.*;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
@@ -40,7 +49,7 @@ public class Resource {
     private AudioParserFFmpegKit audioParser;
     private Context androidContext; // Android context for audio parsing
 
-    public Resource(WeChatDBParser parser, String resDir, String wxgfServer, String avtDb, Context context) {
+    public Resource(WeChatDBParser parser, String resDir, String avtDb, Context context) {
         // Check required directories
         checkDirectory(resDir, "");
         checkDirectory(resDir, IMG_DIRNAME);
@@ -56,7 +65,7 @@ public class Resource {
         this.voiceDir = resDir + File.separator + VOICE_DIRNAME;
         this.videoDir = resDir + File.separator + VIDEO_DIRNAME;
         this.avtReader = new AvatarReader(resDir, avtDb);
-        this.wxgfDecoder = new WxgfAndroidDecoder(wxgfServer);
+        this.wxgfDecoder = new WxgfAndroidDecoder();
         this.emojiReader = new EmojiReader(resDir, parser, wxgfDecoder, null);
         this.executorService = Executors.newFixedThreadPool(3);
         this.httpClient = new OkHttpClient();
@@ -275,16 +284,10 @@ public class Resource {
                 long start = System.currentTimeMillis();
                 buf = wxgfDecoder.decodeWithCache(imgFile, null);
                 if (buf == null) {
-                    if (!wxgfDecoder.hasServer()) {
-                        Log.w(TAG, "wxgf decoder server is not provided. Cannot decode wxgf images. " +
-                                "Please follow instructions to create wxgf decoder server if these images need to be decoded.");
-                    } else {
-                        Log.e(TAG, "Failed to decode wxgf file: " + imgFile);
-                    }
                     return null;
                 } else {
                     long elapsed = System.currentTimeMillis() - start;
-                    if (elapsed > 10 && wxgfDecoder.hasServer()) {
+                    if (elapsed > 10) {
                         Log.i(TAG, String.format("Decoded %s in %.2f seconds", imgFile, elapsed / 1000.0));
                     }
                 }
@@ -373,11 +376,11 @@ public class Resource {
     private String detectImageFormat(byte[] header) {
         if (header.length >= 4) {
             // JPEG
-            if (header[0] == (byte)0xFF && header[1] == (byte)0xD8) {
+            if (header[0] == (byte) 0xFF && header[1] == (byte) 0xD8) {
                 return "jpeg";
             }
             // PNG
-            if (header[0] == (byte)0x89 && header[1] == 0x50 && header[2] == 0x4E && header[3] == 0x47) {
+            if (header[0] == (byte) 0x89 && header[1] == 0x50 && header[2] == 0x4E && header[3] == 0x47) {
                 return "png";
             }
             // GIF
@@ -434,9 +437,6 @@ public class Resource {
     public void close() {
         if (executorService != null) {
             executorService.shutdown();
-        }
-        if (wxgfDecoder != null) {
-            wxgfDecoder.close();
         }
         if (avtReader != null) {
             // avtReader.close() if needed

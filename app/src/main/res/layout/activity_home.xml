@@ -17,9 +17,11 @@
             android:onClick="onBtnClicked"
             android:text="开始" />
 
-        <ListView
-            android:id="@+id/lv_records"
+        <Button
+            android:id="@+id/btn_wxgf"
             android:layout_width="match_parent"
-            android:layout_height="match_parent" />
+            android:layout_height="wrap_content"
+            android:onClick="testWxgfDecoder"
+            android:text="测试wxgf" />
     </LinearLayout>
 </androidx.constraintlayout.widget.ConstraintLayout>

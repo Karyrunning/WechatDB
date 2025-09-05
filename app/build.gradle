@@ -1,3 +1,5 @@
+import com.android.build.api.dsl.Packaging
+
 plugins {
     id 'com.android.application'
     id 'org.jetbrains.kotlin.android'
@@ -35,6 +37,7 @@ android {
     }
     buildFeatures {
         compose true
+        viewBinding = true
     }
     composeOptions {
         kotlinCompilerExtensionVersion '1.5.1'
@@ -42,6 +45,16 @@ android {
     packaging {
         resources {
             excludes += '/META-INF/{AL2.0,LGPL2.1}'
+        }
+    }
+    packagingOptions {
+        pickFirst "**/libvoipCodec.so"
+    }
+
+    // 确保 jniLibs 配置正确
+    sourceSets {
+        main {
+            jniLibs.srcDirs = ['src/main/jniLibs']
         }
     }
 }
@@ -70,8 +83,7 @@ dependencies {
     implementation files('libs/SilkDecoder-1.0.aar')
     implementation 'com.alibaba.fastjson2:fastjson2:2.0.58'
     implementation 'com.google.code.gson:gson:2.11.0'
-//    implementation 'cc.imorning:silk:1.0.1'
-
+    // implementation 'cc.imorning:silk:1.0.1'
     testImplementation 'junit:junit:4.13.2'
     androidTestImplementation 'androidx.test.ext:junit:1.1.5'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.6.1'

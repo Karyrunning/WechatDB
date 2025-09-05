@@ -227,9 +227,6 @@ public class EmojiReader {
             if (WxgfAndroidDecoder.isWxgfBuffer(content)) {
                 content = wxgfDecoder.decodeWithCache(fname.toString(), content);
                 if (content == null) {
-                    if (!wxgfDecoder.hasServer()) {
-                        Log.w(TAG, "wxgf decoder server is not provided. Cannot decode wxgf emojis.");
-                    }
                     throw new Exception("Failed to decrypt wxgf file.");
                 }
             } else {

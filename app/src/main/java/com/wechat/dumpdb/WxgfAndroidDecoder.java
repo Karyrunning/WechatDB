@@ -1,109 +1,22 @@
 package com.wechat.dumpdb;
 
-import android.util.Log;
-
-import org.java_websocket.client.WebSocketClient;
-import org.java_websocket.handshake.ServerHandshake;
+import com.tencent.mm.plugin.gif.MMWXGFJNI;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.net.URI;
-import java.nio.ByteBuffer;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 
 public class WxgfAndroidDecoder {
     private static final String TAG = "WxgfAndroidDecoder";
     private static final byte[] WXGF_HEADER = "wxgf".getBytes();
     private static final byte[] FAILURE_MESSAGE = "FAILED".getBytes();
 
-    private String serverUrl;
-    private WebSocketClient webSocketClient;
-    private boolean isConnected = false;
     private CountDownLatch connectionLatch;
-    private byte[] lastResponse;
-    private boolean responseReceived;
 
-    public WxgfAndroidDecoder(String server) {
-        if (server != null) {
-            if (!server.contains("://")) {
-                server = "ws://" + server;
-            }
-            Log.i(TAG, "Connecting to " + server + " ...");
-            this.serverUrl = server;
-            connect();
-        }
-    }
-
-    private void connect() {
-        try {
-            URI serverUri = URI.create(serverUrl);
-            connectionLatch = new CountDownLatch(1);
-
-            webSocketClient = new WebSocketClient(serverUri) {
-                @Override
-                public void onOpen(ServerHandshake handshake) {
-                    Log.i(TAG, "WebSocket connection opened");
-                    isConnected = true;
-                    connectionLatch.countDown();
-                }
-
-                @Override
-                public void onMessage(String message) {
-                    // Handle text messages if needed
-                }
-
-                @Override
-                public void onMessage(ByteBuffer bytes) {
-                    byte[] data = new byte[bytes.remaining()];
-                    bytes.get(data);
-                    lastResponse = data;
-                    responseReceived = true;
-                    synchronized (WxgfAndroidDecoder.this) {
-                        WxgfAndroidDecoder.this.notifyAll();
-                    }
-                }
-
-                @Override
-                public void onClose(int code, String reason, boolean remote) {
-                    Log.i(TAG, "WebSocket connection closed: " + reason);
-                    isConnected = false;
-                }
-
-                @Override
-                public void onError(Exception ex) {
-                    Log.e(TAG, "WebSocket error: " + ex.getMessage(), ex);
-                    isConnected = false;
-                    connectionLatch.countDown();
-                }
-            };
-
-            webSocketClient.connect();
-
-            // Wait for connection with timeout
-            if (!connectionLatch.await(10, TimeUnit.SECONDS)) {
-                Log.w(TAG, "Connection timeout");
-                isConnected = false;
-            }
-
-        } catch (Exception e) {
-            Log.e(TAG, "Failed to connect to WebSocket server", e);
-            isConnected = false;
-        }
-    }
-
-    public void close() {
-        if (hasServer() && webSocketClient != null) {
-            webSocketClient.close();
-            isConnected = false;
-        }
-    }
-
-    public boolean hasServer() {
-        return webSocketClient != null && isConnected;
+    public WxgfAndroidDecoder() {
     }
 
     public byte[] decode(byte[] data) throws Exception {
@@ -119,64 +32,7 @@ public class WxgfAndroidDecoder {
                 throw new IllegalArgumentException("Invalid WXGF header: " + bytesToHex(header));
             }
         }
-
-        Exception lastException = null;
-
-        // Try to send data, reconnect on failure
-        for (int attempt = 0; attempt < 2; attempt++) {
-            try {
-                if (!hasServer()) {
-                    connect();
-                    if (!hasServer()) {
-                        throw new Exception("Failed to connect to server");
-                    }
-                }
-
-                responseReceived = false;
-                lastResponse = null;
-
-                webSocketClient.send(data);
-
-                // Wait for response with timeout
-                synchronized (this) {
-                    long startTime = System.currentTimeMillis();
-                    while (!responseReceived && System.currentTimeMillis() - startTime < 30000) {
-                        try {
-                            wait(1000);
-                        } catch (InterruptedException e) {
-                            Thread.currentThread().interrupt();
-                            throw new Exception("Interrupted while waiting for response");
-                        }
-                    }
-                }
-
-                if (!responseReceived || lastResponse == null) {
-                    throw new Exception("No response received from server");
-                }
-
-                if (java.util.Arrays.equals(lastResponse, FAILURE_MESSAGE)) {
-                    return null;
-                }
-
-                return lastResponse;
-
-            } catch (Exception e) {
-                lastException = e;
-                Log.w(TAG, "Attempt " + (attempt + 1) + " failed: " + e.getMessage() + ". Reconnecting...");
-
-                // Close and reconnect
-                if (webSocketClient != null) {
-                    webSocketClient.close();
-                }
-                isConnected = false;
-
-                if (attempt == 0) { // Only reconnect on first failure
-                    connect();
-                }
-            }
-        }
-
-        throw new Exception("Failed to decode after multiple attempts", lastException);
+        return MMWXGFJNI.nativeWxam2PicBuf(data);
     }
 
     public byte[] decodeWithCache(String fname, byte[] data) throws Exception {
@@ -192,10 +48,6 @@ public class WxgfAndroidDecoder {
         File outFile = new File(outFname);
         if (outFile.exists()) {
             return readFile(outFname);
-        }
-
-        if (!hasServer()) {
-            return null;
         }
 
         byte[] result = decode(data);

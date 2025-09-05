@@ -1,6 +1,9 @@
 package com.wechat.dumpdb;
 
+import static com.tencent.mm.plugin.gif.MMWXGFJNI.nativeInit;
+
 import android.Manifest;
+import android.content.Context;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
@@ -12,11 +15,23 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
+import com.tencent.mm.plugin.gif.MMWXGFJNI;
+
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 public class HomeActivity extends AppCompatActivity {
     private static final int REQUEST_PERMISSIONS = 1001;
+
+    static {
+        System.loadLibrary("wechatcommon");
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -24,6 +39,8 @@ public class HomeActivity extends AppCompatActivity {
         setContentView(R.layout.activity_home);
         // 申请必要权限
         requestPermissions();
+
+        MMWXGFJNI.initialize(getApplicationInfo().nativeLibraryDir);
     }
 
     public void onBtnClicked(View view) {
@@ -34,8 +51,6 @@ public class HomeActivity extends AppCompatActivity {
 //                String dbRoot = "/storage/emulated/0/Download";
                 String dbPath = dbRoot + "/EnMicroMsg.db";
                 String passWord = "10efc55";
-                String wxgfServer = "192.168.80.188:8666";
-
 //                SQLiteDatabase db = CipherDBHelper.openDatabase(dbPath, passWord);
 //                // 查询
 //                Cursor c = db.rawQuery("SELECT id,type,value FROM userinfo", null);
@@ -50,7 +65,7 @@ public class HomeActivity extends AppCompatActivity {
                 WeChatDBParser dbParser = new WeChatDBParser(dbPath, passWord);
                 String chatId = dbParser.getChatId("karyrunning");
                 List<WeChatMsg> msgList = dbParser.getMessagesByChat(chatId);
-                Resource resource = new Resource(dbParser, dbRoot, wxgfServer, "avatar.index", getBaseContext());
+                Resource resource = new Resource(dbParser, dbRoot, "avatar.index", getBaseContext());
                 resource.cacheVoiceMp3(msgList);
                 HTMLRender render = new HTMLRender(getBaseContext(), dbParser, resource);
                 for (WeChatMsg chatMsg : msgList) {
@@ -84,6 +99,46 @@ public class HomeActivity extends AppCompatActivity {
                     needed.toArray(new String[0]),
                     REQUEST_PERMISSIONS);
         }
+    }
+
+    public void testWxgfDecoder(View view) {
+        byte[] wxgf = null;
+        try {
+            wxgf = readBinary(this);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+        System.out.println("Unit test: wxgf size=" + wxgf.length);
+        byte[] res = MMWXGFJNI.nativeWxam2PicBuf(wxgf);
+        System.out.println("Unit test: res size=" + res.length + " -- " + Arrays.toString(Arrays.copyOfRange(res, 0, 10)));
+
+        try {
+            writeFile(this, "test.jpg", res);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+        if (wxgf.length != 64367 || res.length != 705188) {
+            throw new RuntimeException("test failed");
+        }
+    }
+    public static byte[] readBinary(Context context) throws IOException {
+        InputStream inputStream = context.getResources().openRawResource(R.raw.test_wxgf); // R.raw.image refers to your image.jpg file
+        ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+        byte[] buffer = new byte[1024];
+        int len;
+        while ((len = inputStream.read(buffer)) != -1) {
+            byteArrayOutputStream.write(buffer, 0, len);
+        }
+        inputStream.close(); // Close the input stream
+        return byteArrayOutputStream.toByteArray();
+    }
+
+    public static void writeFile(Context context, String filename, byte[] data) throws IOException {
+        File file = new File(context.getExternalFilesDir(null), filename); // Use null for the type argument to get the root external files directory
+        System.out.println("Writing file to: " + file.getAbsolutePath());
+        FileOutputStream outputStream = new FileOutputStream(file);
+        outputStream.write(data);
+        outputStream.close();
     }
 
     // 权限请求结果回调
