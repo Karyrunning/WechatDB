@@ -56,7 +56,9 @@ public class HTMLRender {
         Map<String, Object> formatDict = new HashMap<>();
         formatDict.put("sender_label", sender);
         formatDict.put("time", DateFormatUtils.format(msg.getCreateTime(), "yyyy-MM-dd HH:mm:ss"));
-
+        formatDict.put("type", msg.getType());
+        formatDict.put("msgId", msg.getMsgId());
+        formatDict.put("msgStr", msg.getMsgStr());
         if (!msg.isKnownType()) {
             Integer count = unknownTypeCounts.get(msg.getType());
             unknownTypeCounts.put(msg.getType(), count == null ? 1 : count + 1);
