@@ -9,6 +9,7 @@ import android.util.Log;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -251,21 +252,47 @@ public class Resource {
                 filteredFnames.add(fname);
             }
         }
-
         if (filteredFnames.isEmpty()) {
             return null;
         }
-
         ImageFiles imageFiles = getImgFile(filteredFnames);
-
-        // Try big file first
         String result = getJpgB64(imageFiles.big);
-        if (result != null) {
-            return result;
+        if (result == null) {
+            result = getJpgB64(imageFiles.small);
         }
+        if (result == null) {
+            return null;
+        }
+        File tempDir = createTempDirectory();
+        if (tempDir == null) {
+            return null;
+        }
+        String imageFile = tempDir + ".jpg";
+        try {
+            // 使用Android的Base64类解码
+            byte[] imageBytes = Base64.decode(result, Base64.DEFAULT);
+            // 写入到文件
+            FileOutputStream fos = new FileOutputStream(imageFile);
+            fos.write(imageBytes);
+            fos.close();
+        } catch (IllegalArgumentException e) {
+            // base64解码失败
+            Log.e("ImageSave", "Base64解码失败: " + e.getMessage());
+            return null;
+        } catch (IOException e) {
+            // 文件写入失败
+            Log.e("ImageSave", "文件写入失败: " + e.getMessage());
+            return null;
+        }
+        return imageFile;
+    }
 
-        // Try small file
-        return getJpgB64(imageFiles.small);
+    private File createTempDirectory() {
+        File tempDir = new File(androidContext.getExternalCacheDir(), "wechatdump_img_" + System.currentTimeMillis());
+        if (!tempDir.mkdirs()) {
+            return null;
+        }
+        return tempDir;
     }
 
     private String getJpgB64(String imgFile) {

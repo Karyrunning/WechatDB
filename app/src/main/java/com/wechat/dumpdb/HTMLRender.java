@@ -142,7 +142,6 @@ public class HTMLRender {
             return;
         }
         formatDict.put("img", img);
-        formatDict.put("imgPath", imgPath);
     }
 
     private void renderMusicMessage(WeChatMsg msg, Map<String, Object> formatDict) {
