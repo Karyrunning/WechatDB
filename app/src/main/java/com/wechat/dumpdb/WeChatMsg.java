@@ -45,6 +45,7 @@ public class WeChatMsg {
             TYPE_LOCATION_SHARING, TYPE_REPLY, TYPE_FILE, TYPE_QQMUSIC, TYPE_APP_MSG
     };
 
+    private String msgId;
     private long msgSvrId;
     private int type;
     private int isSend;
@@ -59,7 +60,7 @@ public class WeChatMsg {
 
     public WeChatMsg(long msgSvrId, int type, int isSend, long createTime,
                      String talker, String content, String imgPath, String chat,
-                     String chatNickname, String talkerNickname) {
+                     String chatNickname, String talkerNickname, String msgId) {
         this.msgSvrId = msgSvrId;
         this.type = type;
         this.isSend = isSend;
@@ -71,6 +72,7 @@ public class WeChatMsg {
         this.chatNickname = chatNickname;
         this.talkerNickname = talkerNickname;
         this.knownType = isKnownType(type);
+        this.msgId = msgId;
     }
 
     /**
@@ -358,6 +360,10 @@ public class WeChatMsg {
         return createTime == other.createTime &&
                 talker.equals(other.talker) &&
                 isSend == other.isSend;
+    }
+
+    public String getMsgId() {
+        return msgId;
     }
 
     public long getMsgSvrId() {

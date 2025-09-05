@@ -3,8 +3,6 @@ package com.wechat.dumpdb;
 import android.content.Context;
 import android.util.Log;
 
-import com.google.gson.Gson;
-
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.jsoup.Jsoup;
@@ -37,21 +35,23 @@ public class HTMLRender {
 
     private Context context;
     private WeChatDBParser parser;
+    private WeChatFilePathResolver filePathResolver;
     private Resource resourceManager;
     private Map<Integer, Integer> unknownTypeCounts;
 
 
-    public HTMLRender(Context context, WeChatDBParser parser, Resource resourceManager) {
+    public HTMLRender(Context context, WeChatDBParser parser, Resource resourceManager, WeChatFilePathResolver filePathResolver) {
         this.context = context;
         this.parser = parser;
         this.resourceManager = resourceManager;
         this.unknownTypeCounts = new HashMap<>();
+        this.filePathResolver = filePathResolver;
     }
 
     /**
      * Render a single WeChat message to HTML
      */
-    public void renderMessage(WeChatMsg msg) {
+    public Map<String, Object> renderMessage(WeChatMsg msg) {
         String sender = msg.getIsSend() == 1 ? "me" : (msg.getTalker());
         Map<String, Object> formatDict = new HashMap<>();
         formatDict.put("sender_label", sender);
@@ -68,7 +68,7 @@ public class HTMLRender {
         } else {
             formatDict.put("nickname", " ");
         }
-//        formatDict.put("data", msg.getContentXmlReady());
+        formatDict.put("data", msg.getContent());
         switch (msg.getType()) {
             case WeChatMsg.TYPE_SPEAK:
                 renderVoiceMessage(msg, formatDict);
@@ -92,10 +92,22 @@ public class HTMLRender {
             case WeChatMsg.TYPE_WX_VIDEO:
                 renderFallbackMessage(msg, formatDict);
                 break;
+            case WeChatMsg.TYPE_FILE:
+                renderFileMessage(msg, formatDict);
+                break;
             default:
                 renderFallbackMessage(msg, formatDict);
         }
-        Log.i(TAG, new Gson().toJson(formatDict));
+        return formatDict;
+    }
+
+    private void renderFileMessage(WeChatMsg msg, Map<String, Object> formatDict) {
+        FileInfo fileInfo = parser.getFileInfo(msg.getMsgId());
+        if (fileInfo != null) {
+            String realPath = filePathResolver.resolvePath(fileInfo.path);
+            formatDict.put("filePath", realPath);
+        }
+        formatDict.put("content", msg.getMsgStr());
     }
 
     private void renderFallbackMessage(WeChatMsg msg, Map<String, Object> formatDict) {

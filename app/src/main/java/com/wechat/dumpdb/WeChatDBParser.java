@@ -17,10 +17,11 @@ public class WeChatDBParser {
 
     // 数据库字段定义
     private static final String[] FIELDS = {
-            "msgSvrId", "type", "isSend", "createTime", "talker", "content", "imgPath"
+            "msgSvrId", "type", "isSend", "createTime", "talker", "content", "imgPath", "msgId"
     };
 
     private SQLiteDatabase database;
+    private SQLiteDatabase filedb;
     private Map<String, String> contacts = new HashMap<>();           // username -> nickname
     private Map<String, List<String>> contactsRev = new HashMap<>();  // nickname -> List<username>
     private Map<String, List<WeChatMsg>> msgsByChat = new HashMap<>(); // chat -> List<messages>
@@ -30,9 +31,12 @@ public class WeChatDBParser {
     private Map<String, String> avatarUrls = new HashMap<>();
     private String username;
 
-    public WeChatDBParser(String dbPath, String password) {
+    public WeChatDBParser(String dbRoot, String password) {
         try {
+            String dbPath = dbRoot + "/EnMicroMsg.db";
             database = CipherDBHelper.openDatabase(dbPath, password);
+            String fileDbPath = dbRoot + "/WxFileIndex.db";
+            filedb = CipherDBHelper.openDatabase(fileDbPath, password);
             parse();
         } catch (Exception e) {
             Log.e(TAG, "Failed to open database: " + e.getMessage());
@@ -174,6 +178,7 @@ public class WeChatDBParser {
             String talker = cursor.getString(4);
             String content = cursor.getString(5);
             String imgPath = cursor.getString(6);
+            String msgId = cursor.getString(7);
 
             if (content == null) content = "";
 
@@ -215,7 +220,7 @@ public class WeChatDBParser {
             }
 
             return new WeChatMsg(msgSvrId, type, isSend, createTime, talker,
-                    content, imgPath, chat, chatNickname, talkerNickname);
+                    content, imgPath, chat, chatNickname, talkerNickname, msgId);
 
         } catch (Exception e) {
             Log.e(TAG, "Error parsing message row: " + e.getMessage());
@@ -330,6 +335,31 @@ public class WeChatDBParser {
             cursor = database.rawQuery(query, null);
             if (cursor.moveToFirst()) {
                 return cursor.getString(0);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error getting emoji encryption key: " + e.getMessage());
+        } finally {
+            if (cursor != null) cursor.close();
+        }
+        return null;
+    }
+
+    public FileInfo getFileInfo(String msgId) {
+        String query = "SELECT msgId, username, msgType,msgSubType,path,size,msgtime,diskSpace FROM WxFileIndex3 where msgId='" + msgId + "'";
+        Cursor cursor = null;
+        try {
+            cursor = filedb.rawQuery(query, null);
+            if (cursor.moveToFirst()) {
+                FileInfo fileInfo = new FileInfo();
+                fileInfo.msgId = cursor.getString(0);
+                fileInfo.username = cursor.getString(1);
+                fileInfo.msgType = cursor.getString(2);
+                fileInfo.msgSubType = cursor.getString(3);
+                fileInfo.path = cursor.getString(4);
+                fileInfo.size = cursor.getString(5);
+                fileInfo.msgtime = cursor.getString(6);
+                fileInfo.diskSpace = cursor.getString(7);
+                return fileInfo;
             }
         } catch (Exception e) {
             Log.e(TAG, "Error getting emoji encryption key: " + e.getMessage());

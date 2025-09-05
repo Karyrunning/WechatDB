@@ -1,13 +1,12 @@
 package com.wechat.dumpdb;
 
-import static com.tencent.mm.plugin.gif.MMWXGFJNI.nativeInit;
-
 import android.Manifest;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
+import android.util.Log;
 import android.view.View;
 import android.widget.Toast;
 
@@ -25,9 +24,12 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 
 public class HomeActivity extends AppCompatActivity {
     private static final int REQUEST_PERMISSIONS = 1001;
+
+    private static final String TAG = "HomeActivity";
 
     static {
         System.loadLibrary("wechatcommon");
@@ -49,7 +51,6 @@ public class HomeActivity extends AppCompatActivity {
             public void run() {
                 String dbRoot = "/storage/emulated/0/Download/com.tencent.mm/MicroMsg/3d7f491a654552450d1352e52d0891a1";
 //                String dbRoot = "/storage/emulated/0/Download";
-                String dbPath = dbRoot + "/EnMicroMsg.db";
                 String passWord = "10efc55";
 //                SQLiteDatabase db = CipherDBHelper.openDatabase(dbPath, passWord);
 //                // 查询
@@ -62,15 +63,18 @@ public class HomeActivity extends AppCompatActivity {
 //                c.close();
 //                db.close();
 
-                WeChatDBParser dbParser = new WeChatDBParser(dbPath, passWord);
+                WeChatDBParser dbParser = new WeChatDBParser(dbRoot, passWord);
+                WeChatFilePathResolver filePathResolver = new WeChatFilePathResolver(dbRoot);
                 String chatId = dbParser.getChatId("karyrunning");
                 List<WeChatMsg> msgList = dbParser.getMessagesByChat(chatId);
                 Resource resource = new Resource(dbParser, dbRoot, "avatar.index", getBaseContext());
                 resource.cacheVoiceMp3(msgList);
-                HTMLRender render = new HTMLRender(getBaseContext(), dbParser, resource);
+                HTMLRender render = new HTMLRender(getBaseContext(), dbParser, resource, filePathResolver);
+                List<Map<String, Object>> dataList = new ArrayList<>();
                 for (WeChatMsg chatMsg : msgList) {
-                    render.renderMessage(chatMsg);
+                    dataList.add(render.renderMessage(chatMsg));
                 }
+                Log.d(TAG, "转换完成");
             }
         });
     }
@@ -121,6 +125,7 @@ public class HomeActivity extends AppCompatActivity {
             throw new RuntimeException("test failed");
         }
     }
+
     public static byte[] readBinary(Context context) throws IOException {
         InputStream inputStream = context.getResources().openRawResource(R.raw.test_wxgf); // R.raw.image refers to your image.jpg file
         ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
