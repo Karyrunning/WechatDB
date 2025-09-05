@@ -35,13 +35,13 @@ public class AudioParser {
             return doParseWechatAudioFile(fileName);
         } catch (Exception e) {
             Log.e(TAG, "Error when parsing audio file " + fileName + ": " + e.getMessage(), e);
-            return new AudioResult("", 0);
+            return new AudioResult("", 0L);
         }
     }
 
     private AudioResult doParseWechatAudioFile(String fileName) throws Exception {
         if (fileName == null || fileName.isEmpty()) {
-            return new AudioResult("", 0);
+            return new AudioResult("", 0L);
         }
 
         // Create temporary directory
@@ -60,7 +60,7 @@ public class AudioParser {
             }
 
             String headerStr = new String(header);
-            float duration;
+            Long duration;
 
             if (headerStr.contains("AMR")) {
                 // Handle AMR format using FFmpeg
@@ -84,7 +84,7 @@ public class AudioParser {
         }
     }
 
-    private float convertAmrToMp3(String inputFile, String outputFile) throws Exception {
+    private Long convertAmrToMp3(String inputFile, String outputFile) throws Exception {
         // Use FFmpeg to convert AMR to MP3
         String[] ffmpegCmd = {
                 getFFmpegPath(),
@@ -108,7 +108,7 @@ public class AudioParser {
         return getAudioDuration(outputFile);
     }
 
-    private float convertSilkToMp3(String inputFile, String outputFile, File tempDir) throws Exception {
+    private Long convertSilkToMp3(String inputFile, String outputFile, File tempDir) throws Exception {
         if (silkDecoderPath == null || !new File(silkDecoderPath).exists()) {
             throw new RuntimeException("Silk decoder is not available. Please include silk decoder in assets.");
         }
@@ -132,7 +132,7 @@ public class AudioParser {
         }
 
         // Parse duration from silk decoder output
-        float duration = parseSilkDuration(silkOutput);
+        Long duration = parseSilkDuration(silkOutput);
 
         // Convert raw PCM to MP3 using FFmpeg
         String[] ffmpegCmd = {
@@ -157,25 +157,25 @@ public class AudioParser {
         return duration;
     }
 
-    private float parseSilkDuration(String silkOutput) throws Exception {
+    private Long parseSilkDuration(String silkOutput) throws Exception {
         // Look for "File length" in silk decoder output
         Pattern pattern = Pattern.compile("File length\\s*:\\s*([0-9.]+)\\s*ms");
         Matcher matcher = pattern.matcher(silkOutput);
 
         if (matcher.find()) {
-            return Float.parseFloat(matcher.group(1)) / 1000.0f; // Convert ms to seconds
+            return Long.parseLong(matcher.group(1)); // Convert ms to seconds
         }
 
         throw new RuntimeException("Could not parse duration from silk decoder output: " + silkOutput);
     }
 
-    private float getAudioDuration(String audioFile) {
+    private Long getAudioDuration(String audioFile) {
         MediaMetadataRetriever retriever = new MediaMetadataRetriever();
         try {
             retriever.setDataSource(audioFile);
             String durationStr = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION);
             if (durationStr != null) {
-                return Long.parseLong(durationStr) / 1000.0f; // Convert ms to seconds
+                return Long.parseLong(durationStr); // Convert ms to seconds
             }
         } catch (Exception e) {
             Log.w(TAG, "Failed to get audio duration using MediaMetadataRetriever", e);
@@ -186,7 +186,7 @@ public class AudioParser {
                 // Ignore
             }
         }
-        return 0;
+        return 0L;
     }
 
     private String getFFmpegPath() {
@@ -271,16 +271,5 @@ public class AudioParser {
             }
         }
         return error.toString();
-    }
-
-    // Result class
-    public static class AudioResult {
-        public final String mp3Base64;
-        public final float duration;
-
-        public AudioResult(String mp3Base64, float duration) {
-            this.mp3Base64 = mp3Base64;
-            this.duration = duration;
-        }
     }
 }

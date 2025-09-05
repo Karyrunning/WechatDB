@@ -28,7 +28,7 @@ public class Resource {
     private String resDir;
     private WeChatDBParser parser;
     private Map<String, Integer> voiceCacheIdx;
-    private List<Future<VoiceResult>> voiceCache;
+    private List<Future<AudioResult>> voiceCache;
     private String imgDir;
     private String voiceDir;
     private String videoDir;
@@ -93,7 +93,7 @@ public class Resource {
         return ret;
     }
 
-    public VoiceResult getVoiceMp3(String imgPath) {
+    public AudioResult getVoiceMp3(String imgPath) {
         Integer idx = voiceCacheIdx.get(imgPath);
         if (idx == null) {
             return parseWechatAudioFile(getVoiceFilename(imgPath));
@@ -103,7 +103,7 @@ public class Resource {
             return voiceCache.get(idx).get();
         } catch (Exception e) {
             Log.e(TAG, "Error getting cached voice", e);
-            return new VoiceResult("", 0);
+            return new AudioResult("", 0L);
         }
     }
 
@@ -123,7 +123,7 @@ public class Resource {
         voiceCache = new ArrayList<>();
         for (String voicePath : voicePaths) {
             String filename = getVoiceFilename(voicePath);
-            Future<VoiceResult> future = executorService.submit(() -> parseWechatAudioFile(filename));
+            Future<AudioResult> future = executorService.submit(() -> parseWechatAudioFile(filename));
             voiceCache.add(future);
         }
     }
@@ -407,9 +407,9 @@ public class Resource {
     }
 
     // Implement audio file parsing using AudioParser
-    private VoiceResult parseWechatAudioFile(String filename) {
+    private AudioResult parseWechatAudioFile(String filename) {
         if (filename == null || filename.isEmpty()) {
-            return new VoiceResult("", 0);
+            return new AudioResult("", 0L);
         }
 
         // Initialize audio parser if not already done
@@ -418,17 +418,16 @@ public class Resource {
             // and store it as a field to use here
             if (androidContext == null) {
                 Log.e(TAG, "Android Context not available for audio parsing");
-                return new VoiceResult("", 0);
+                return new AudioResult("", 0L);
             }
             audioParser = new AudioParserFFmpegKit(androidContext);
         }
 
         try {
-            AudioParser.AudioResult result = audioParser.parseWechatAudioFile(filename);
-            return new VoiceResult(result.mp3Base64, (int) Math.ceil(result.duration));
+            return audioParser.doParseWechatAudioFile(filename);
         } catch (Exception e) {
             Log.e(TAG, "Error parsing audio file: " + filename, e);
-            return new VoiceResult("", 0);
+            return new AudioResult("", 0L);
         }
     }
 
@@ -447,17 +446,6 @@ public class Resource {
         }
         if (audioParser != null) {
             // audioParser.close()； if needed - clean up any resources
-        }
-    }
-
-    // Data classes
-    public static class VoiceResult {
-        public final String mp3Data;
-        public final int duration;
-
-        public VoiceResult(String mp3Data, int duration) {
-            this.mp3Data = mp3Data;
-            this.duration = duration;
         }
     }
 

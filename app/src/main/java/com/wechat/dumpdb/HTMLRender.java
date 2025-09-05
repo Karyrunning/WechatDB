@@ -104,10 +104,10 @@ public class HTMLRender {
     }
 
     private void renderVoiceMessage(WeChatMsg msg, Map<String, Object> formatDict) {
-        Resource.VoiceResult voiceData = resourceManager.getVoiceMp3(msg.getImgPath());
+        AudioResult voiceData = resourceManager.getVoiceMp3(msg.getImgPath());
         if (voiceData != null) {
             formatDict.put("voice_duration", voiceData.duration);
-            formatDict.put("voice_str", voiceData.mp3Data);
+            formatDict.put("voice_path", voiceData.mp3Url);
         }
     }
 
@@ -128,7 +128,7 @@ public class HTMLRender {
             return;
         }
         formatDict.put("img", img);
-        formatDict.put("filenames", filenames);
+        formatDict.put("imgPath", imgPath);
     }
 
     private void renderMusicMessage(WeChatMsg msg, Map<String, Object> formatDict) {
