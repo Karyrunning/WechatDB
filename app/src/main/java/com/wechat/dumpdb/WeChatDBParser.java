@@ -128,7 +128,7 @@ public class WeChatDBParser {
      * 解析消息表
      */
     private void parseMsg(Long startTime) {
-        String query = "SELECT " + String.join(",", FIELDS) + " FROM message";
+        String query = "SELECT " + String.join(",", FIELDS) + " FROM message WHERE 1=1 ";
         if (startTime != null) {
             query = query + " AND createTime>" + startTime + " ";
         }
