@@ -37,7 +37,6 @@ public class WeChatDBParser {
             database = CipherDBHelper.openDatabase(dbPath, password);
             String fileDbPath = dbRoot + "/WxFileIndex.db";
             filedb = CipherDBHelper.openDatabase(fileDbPath, password);
-            parse();
         } catch (Exception e) {
             Log.e(TAG, "Failed to open database: " + e.getMessage());
         }
@@ -46,10 +45,10 @@ public class WeChatDBParser {
     /**
      * 解析数据库的主方法
      */
-    private void parse() {
+    public void parse(Long startTime) {
         parseContact();
         parseUserInfo();
-        parseMsg();
+        parseMsg(startTime);
         parseImgInfo();
         parseEmoji();
         parseImgFlag();
@@ -128,8 +127,11 @@ public class WeChatDBParser {
     /**
      * 解析消息表
      */
-    private void parseMsg() {
+    private void parseMsg(Long startTime) {
         String query = "SELECT " + String.join(",", FIELDS) + " FROM message";
+        if (startTime != null) {
+            query = query + " AND createTime>" + startTime + " ";
+        }
         Cursor cursor = null;
         int totalMsgCount = 0;
 

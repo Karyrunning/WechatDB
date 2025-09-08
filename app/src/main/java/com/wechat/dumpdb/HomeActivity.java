@@ -14,6 +14,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
+import com.alibaba.fastjson2.util.DateUtils;
 import com.tencent.mm.plugin.gif.MMWXGFJNI;
 
 import java.io.ByteArrayOutputStream;
@@ -62,8 +63,11 @@ public class HomeActivity extends AppCompatActivity {
 //                }
 //                c.close();
 //                db.close();
+                Long startTime = DateUtils.parseDate("2025-04-19 00:00:00", "yyyy-MM-dd HH:mm:ss").getTime();
 
                 WeChatDBParser dbParser = new WeChatDBParser(dbRoot, passWord);
+                dbParser.parse(startTime);
+
                 WeChatFilePathResolver filePathResolver = new WeChatFilePathResolver(dbRoot);
                 String chatId = dbParser.getChatId("karyrunning");
                 List<WeChatMsg> msgList = dbParser.getMessagesByChat(chatId);
